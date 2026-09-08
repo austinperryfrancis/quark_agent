@@ -34,9 +34,16 @@ class VaultConfig(StrictModel):
     path: Path | None = None
     inbox: Path = Path("Inbox")
     exclude: list[str] = Field(
-        default_factory=lambda: [".obsidian", "Templates", "Archive", "backups"]
+        default_factory=lambda: [
+            ".obsidian",
+            ".quark",
+            "Templates",
+            "Archive",
+            "backups",
+        ]
     )
     create_backups: bool = True
+    backup_retention: int = Field(default=5, ge=1)
 
 
 class PermissionsConfig(StrictModel):

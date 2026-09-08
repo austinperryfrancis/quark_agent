@@ -23,3 +23,8 @@ implementations.
 Shared defaults live in `config/quark.yaml`. Machine-specific values such as the
 vault path and local model name belong in ignored `config/quark.local.yaml`,
 which is merged over the defaults. Run `quark check-config` to validate them.
+
+Validated writes can retain original notes under `.quark/backups/` inside the
+vault. `vault.backup_retention` controls how many timestamped backups are kept
+per note; the default is five. The `.quark` directory is excluded from note
+discovery. Backups are ordinary files and can be copied back to recover a note.

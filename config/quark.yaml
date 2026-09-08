@@ -15,8 +15,9 @@ model:
 vault:
   path: null
   inbox: Inbox
-  exclude: [.obsidian, Templates, Archive, backups]
+  exclude: [.obsidian, .quark, Templates, Archive, backups]
   create_backups: true
+  backup_retention: 5
 
 permissions:
   allow_read: true
