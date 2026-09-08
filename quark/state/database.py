@@ -14,7 +14,7 @@ from typing import Any, cast
 
 from quark.state.models import GoalStatus, StepStatus, enum_value
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS goals (
@@ -121,6 +121,19 @@ CREATE INDEX IF NOT EXISTS idx_events_goal ON events(goal_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_errors_goal ON errors(goal_id, created_at);
 """
 
+_MIGRATION_2 = """
+CREATE TABLE IF NOT EXISTS semantic_cache (
+    cache_key TEXT PRIMARY KEY,
+    operation TEXT NOT NULL,
+    model_policy_json TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_semantic_cache_content ON semantic_cache(content_hash);
+"""
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
@@ -184,8 +197,12 @@ class StateDatabase:
                 )
             if version < 1:
                 self.connection.executescript(_MIGRATION_1)
-                self.connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-                self.connection.commit()
+                version = 1
+            if version < 2:
+                self.connection.executescript(_MIGRATION_2)
+                version = 2
+            self.connection.execute(f"PRAGMA user_version = {version}")
+            self.connection.commit()
 
     def create_goal(
         self,
@@ -348,6 +365,28 @@ class StateDatabase:
             payload={"validation_ok": validation_ok, "duration_ms": duration_ms},
         )
 
+    def retry_step(self, step_id: int) -> None:
+        with self.transaction() as connection:
+            connection.execute(
+                "UPDATE steps SET status=? WHERE id=?",
+                (StepStatus.PENDING.value, step_id),
+            )
+
+    def fail_step(self, step_id: int, *, blocked: bool = False) -> None:
+        status = StepStatus.BLOCKED.value if blocked else StepStatus.FAILED.value
+        with self.transaction() as connection:
+            connection.execute(
+                "UPDATE steps SET status=?, completed_at=? WHERE id=?",
+                (status, _now(), step_id),
+            )
+
+    def goal_step_counts(self, goal_id: int) -> dict[str, int]:
+        rows = self.connection.execute(
+            "SELECT status, COUNT(*) AS count FROM steps WHERE goal_id=? GROUP BY status",
+            (goal_id,),
+        ).fetchall()
+        return {str(row["status"]): int(row["count"]) for row in rows}
+
     def record_event(
         self,
         event_type: str,
@@ -418,6 +457,43 @@ class StateDatabase:
                 "INSERT INTO facts(fact_key,value_json,source,created_at,updated_at) VALUES(?,?,?,?,?) "
                 "ON CONFLICT(fact_key) DO UPDATE SET value_json=excluded.value_json, source=excluded.source, updated_at=excluded.updated_at",
                 (fact_key, _json(value), source, now, now),
+            )
+
+    def get_semantic_cache(self, cache_key: str) -> Any | None:
+        row = self.connection.execute(
+            "SELECT result_json FROM semantic_cache WHERE cache_key=?", (cache_key,)
+        ).fetchone()
+        if row is None:
+            return None
+        with self.transaction() as connection:
+            connection.execute(
+                "UPDATE semantic_cache SET last_used_at=? WHERE cache_key=?",
+                (_now(), cache_key),
+            )
+        return json.loads(row["result_json"])
+
+    def put_semantic_cache(
+        self,
+        cache_key: str,
+        operation: str,
+        model_policy: Any,
+        content_hash: str,
+        result: Any,
+    ) -> None:
+        now = _now()
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO semantic_cache(cache_key,operation,model_policy_json,content_hash,result_json,created_at,last_used_at) VALUES(?,?,?,?,?,?,?) "
+                "ON CONFLICT(cache_key) DO UPDATE SET result_json=excluded.result_json,last_used_at=excluded.last_used_at",
+                (
+                    cache_key,
+                    operation,
+                    _json(model_policy),
+                    content_hash,
+                    _json(result),
+                    now,
+                    now,
+                ),
             )
 
     def record_model_call(

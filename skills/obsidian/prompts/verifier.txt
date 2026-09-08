@@ -1,0 +1,1 @@
+Verify the proposed semantic result against the supplied evidence. Return JSON only.

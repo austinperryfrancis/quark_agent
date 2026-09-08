@@ -13,10 +13,44 @@ capabilities:
   - obsidian.validate_note
   - obsidian.apply_changes
 
+capability_metadata:
+  obsidian.list_notes:
+    description: Recursively list Markdown notes in the configured vault.
+    risk: READ
+  obsidian.read_note:
+    description: Read one note and capture a content-hashed snapshot.
+    risk: READ
+  obsidian.parse_frontmatter:
+    description: Parse note metadata and deterministic Markdown structures.
+    risk: PURE
+  obsidian.search_notes:
+    description: Retrieve candidate notes using local indexes.
+    risk: READ
+  obsidian.generate_tags:
+    description: Select canonical tags for a note.
+    lane: small_model
+    operation_type: semantic
+    model_required: true
+  obsidian.find_related_notes:
+    description: Rank candidate notes by semantic relationship.
+    lane: small_model
+    operation_type: semantic
+    model_required: true
+  obsidian.generate_frontmatter:
+    description: Generate structured metadata fields.
+    lane: small_model
+    operation_type: semantic
+    model_required: true
+  obsidian.validate_note:
+    description: Validate a proposed note update.
+    risk: PURE
+  obsidian.apply_changes:
+    description: Apply a validated note patch atomically.
+    risk: WRITE
+
 permissions:
   filesystem:
     read:
       - configured_vault
     write:
       - configured_vault
-

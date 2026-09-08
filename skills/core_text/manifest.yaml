@@ -8,5 +8,22 @@ capabilities:
   - text.compare
   - text.summarize
 
-permissions: {}
+capability_metadata:
+  text.classify:
+    lane: small_model
+    operation_type: semantic
+    model_required: true
+  text.extract:
+    lane: small_model
+    operation_type: semantic
+    model_required: true
+  text.compare:
+    lane: small_model
+    operation_type: semantic
+    model_required: true
+  text.summarize:
+    lane: small_model
+    operation_type: semantic
+    model_required: true
 
+permissions: {}
