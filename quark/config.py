@@ -45,6 +45,9 @@ class VaultConfig(StrictModel):
     )
     create_backups: bool = True
     backup_retention: int = Field(default=5, ge=1)
+    project_choices: list[str] = Field(default_factory=list)
+    protected_tags: list[str] = Field(default_factory=list)
+    forbidden_tags: list[str] = Field(default_factory=list)
 
 
 class PermissionsConfig(StrictModel):

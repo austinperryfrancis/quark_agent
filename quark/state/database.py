@@ -14,7 +14,7 @@ from typing import Any, cast
 
 from quark.state.models import GoalStatus, StepStatus, enum_value
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 _MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS goals (
@@ -134,6 +134,44 @@ CREATE TABLE IF NOT EXISTS semantic_cache (
 CREATE INDEX IF NOT EXISTS idx_semantic_cache_content ON semantic_cache(content_hash);
 """
 
+_MIGRATION_3 = """
+CREATE TABLE IF NOT EXISTS tag_index (
+    canonical_tag TEXT PRIMARY KEY,
+    aliases_json TEXT NOT NULL DEFAULT '[]',
+    frequency INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS tag_observations (
+    note_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    PRIMARY KEY(note_id, tag)
+);
+CREATE TABLE IF NOT EXISTS tag_cooccurrence (
+    tag_a TEXT NOT NULL,
+    tag_b TEXT NOT NULL,
+    frequency INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(tag_a, tag_b)
+);
+CREATE INDEX IF NOT EXISTS idx_tag_index_frequency ON tag_index(frequency DESC);
+"""
+
+_MIGRATION_4 = """
+CREATE TABLE IF NOT EXISTS note_index (
+    note_id TEXT PRIMARY KEY,
+    content_hash TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    project TEXT,
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    people_json TEXT NOT NULL DEFAULT '[]',
+    outgoing_json TEXT NOT NULL DEFAULT '[]',
+    backlinks_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
+);
+CREATE VIRTUAL TABLE IF NOT EXISTS note_fts USING fts5(note_id UNINDEXED, title, body);
+"""
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
@@ -201,6 +239,12 @@ class StateDatabase:
             if version < 2:
                 self.connection.executescript(_MIGRATION_2)
                 version = 2
+            if version < 3:
+                self.connection.executescript(_MIGRATION_3)
+                version = 3
+            if version < 4:
+                self.connection.executescript(_MIGRATION_4)
+                version = 4
             self.connection.execute(f"PRAGMA user_version = {version}")
             self.connection.commit()
 
@@ -495,6 +539,52 @@ class StateDatabase:
                     now,
                 ),
             )
+
+    def replace_tag_observations(
+        self, note_id: str, content_hash: str, tags: list[tuple[str, str]]
+    ) -> None:
+        """Replace one note's tag observations and maintain canonical frequencies."""
+        with self.transaction() as connection:
+            connection.execute(
+                "DELETE FROM tag_observations WHERE note_id=?", (note_id,)
+            )
+            connection.executemany(
+                "INSERT INTO tag_observations(note_id,tag,content_hash) VALUES(?,?,?)",
+                ((note_id, tag, content_hash) for tag, _ in tags),
+            )
+            for canonical, alias in tags:
+                row = connection.execute(
+                    "SELECT aliases_json FROM tag_index WHERE canonical_tag=?",
+                    (canonical,),
+                ).fetchone()
+                aliases = json.loads(row["aliases_json"]) if row else []
+                if alias != canonical and alias not in aliases:
+                    aliases.append(alias)
+                connection.execute(
+                    "INSERT INTO tag_index(canonical_tag,aliases_json,frequency,updated_at) VALUES(?,?,0,?) "
+                    "ON CONFLICT(canonical_tag) DO UPDATE SET aliases_json=excluded.aliases_json,updated_at=excluded.updated_at",
+                    (canonical, _json(sorted(aliases)), _now()),
+                )
+            connection.execute(
+                "UPDATE tag_index SET frequency=(SELECT COUNT(*) FROM tag_observations o WHERE o.tag=tag_index.canonical_tag)"
+            )
+            connection.execute("DELETE FROM tag_cooccurrence")
+            connection.execute(
+                "INSERT INTO tag_cooccurrence(tag_a,tag_b,frequency) "
+                "SELECT a.tag,b.tag,COUNT(*) FROM tag_observations a "
+                "JOIN tag_observations b ON a.note_id=b.note_id AND a.tag < b.tag "
+                "GROUP BY a.tag,b.tag"
+            )
+
+    def clear_tag_observations(self) -> None:
+        with self.transaction() as connection:
+            connection.execute("DELETE FROM tag_observations")
+            connection.execute("UPDATE tag_index SET frequency=0")
+
+    def list_tag_index(self) -> list[sqlite3.Row]:
+        return self.connection.execute(
+            "SELECT * FROM tag_index ORDER BY frequency DESC, canonical_tag"
+        ).fetchall()
 
     def record_model_call(
         self,

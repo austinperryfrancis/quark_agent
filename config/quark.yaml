@@ -18,6 +18,9 @@ vault:
   exclude: [.obsidian, .quark, Templates, Archive, backups]
   create_backups: true
   backup_retention: 5
+  project_choices: []
+  protected_tags: []
+  forbidden_tags: []
 
 permissions:
   allow_read: true

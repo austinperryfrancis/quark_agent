@@ -38,11 +38,20 @@ def _schema_errors(value: Any, schema: dict[str, Any], path: str = "$") -> list[
         "integer": isinstance(value, int) and not isinstance(value, bool),
         "number": isinstance(value, (int, float)) and not isinstance(value, bool),
         "boolean": isinstance(value, bool),
+        "null": value is None,
     }
-    if expected in type_ok and not type_ok[expected]:
+    if isinstance(expected, list):
+        if not any(type_ok.get(item, True) for item in expected):
+            return [f"{path} must be one of {expected}"]
+    elif expected in type_ok and not type_ok[expected]:
         return [f"{path} must be {expected}"]
     if "enum" in schema and value not in schema["enum"]:
         errors.append(f"{path} must be one of {schema['enum']}")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            errors.append(f"{path} must be at least {schema['minimum']}")
+        if "maximum" in schema and value > schema["maximum"]:
+            errors.append(f"{path} must be at most {schema['maximum']}")
     if isinstance(value, dict):
         for key in schema.get("required", []):
             if key not in value:
@@ -56,6 +65,10 @@ def _schema_errors(value: Any, schema: dict[str, Any], path: str = "$") -> list[
             if key in value and isinstance(child_schema, dict):
                 errors.extend(_schema_errors(value[key], child_schema, f"{path}.{key}"))
     if isinstance(value, list) and isinstance(schema.get("items"), dict):
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            errors.append(f"{path} must contain at most {schema['maxItems']} items")
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            errors.append(f"{path} must contain at least {schema['minItems']} items")
         for index, item in enumerate(value):
             errors.extend(_schema_errors(item, schema["items"], f"{path}[{index}]"))
     return errors
