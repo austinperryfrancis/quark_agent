@@ -1,2 +1,1 @@
 """SQLite state database access."""
-

@@ -6,3 +6,20 @@ and enriches Obsidian notes while the core runtime remains domain-independent.
 
 The repository is currently scaffolded from the project architecture document.
 
+## Development
+
+Quark supports Python 3.11 and newer. Install the development environment with
+`python3.11 -m venv .venv`, activate it, then run
+`python -m pip install -e '.[dev]'`.
+
+The baseline checks are `ruff check .`, `ruff format --check .`, `mypy`, and
+`pytest`; CI runs the same commands.
+
+The `skills` namespace contains installable domain modules. Skills are discovered
+from their manifests by the capability loader, while Python operations use normal
+`skills.<name>.operations` import paths. The core remains independent of skill
+implementations.
+
+Shared defaults live in `config/quark.yaml`. Machine-specific values such as the
+vault path and local model name belong in ignored `config/quark.local.yaml`,
+which is merged over the defaults. Run `quark check-config` to validate them.

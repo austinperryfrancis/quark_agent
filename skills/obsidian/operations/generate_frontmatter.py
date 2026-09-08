@@ -1,2 +1,1 @@
 """Generate structured frontmatter fields."""
-

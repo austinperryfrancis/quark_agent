@@ -1,2 +1,1 @@
 """Ollama model provider."""
-

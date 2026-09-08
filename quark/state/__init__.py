@@ -1,2 +1,1 @@
 """Persistent Quark state."""
-

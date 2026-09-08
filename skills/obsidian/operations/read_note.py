@@ -1,2 +1,1 @@
 """Read an Obsidian note."""
-

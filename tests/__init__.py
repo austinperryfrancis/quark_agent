@@ -1,2 +1,1 @@
 """Quark Agent test suite."""
-

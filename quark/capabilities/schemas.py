@@ -1,2 +1,1 @@
 """Capability metadata schemas."""
-
