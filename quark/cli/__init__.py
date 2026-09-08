@@ -1,5 +1,6 @@
 """Quark command-line interface."""
 
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -7,6 +8,7 @@ import typer
 
 from quark.config import ConfigurationError, load_config
 from quark.logging import configure_logging
+from quark.state.database import StateDatabase
 
 app = typer.Typer(
     name="quark",
@@ -31,11 +33,40 @@ def check_config(
     except ConfigurationError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=2) from error
-    configure_logging(settings.runtime.log_level, settings.runtime.log_format)
+    configure_logging(
+        settings.runtime.log_level,
+        settings.runtime.log_format,
+        tuple(settings.runtime.redact),
+    )
     typer.echo(
         "Configuration valid "
         f"(provider={settings.model.provider}, dry_run={settings.runtime.dry_run})"
     )
+
+
+@app.command("inspect-goal")
+def inspect_goal(
+    goal_id: int,
+    database: Annotated[Path, typer.Option("--database", "-d")] = Path("quark.db"),
+) -> None:
+    """Print persisted goal, step, and event state."""
+    with StateDatabase(database) as state:
+        snapshot = state.inspect_goal(goal_id)
+    if snapshot is None:
+        typer.echo(f"Goal not found: {goal_id}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(json.dumps(snapshot, indent=2, default=str))
+
+
+@app.command("why-changed")
+def why_changed(
+    note_path: str,
+    database: Annotated[Path, typer.Option("--database", "-d")] = Path("quark.db"),
+) -> None:
+    """Show audit events whose payload references a note path."""
+    with StateDatabase(database) as state:
+        events = state.explain_change(note_path)
+    typer.echo(json.dumps(events, indent=2, default=str))
 
 
 __all__ = ["app"]

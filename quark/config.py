@@ -19,6 +19,7 @@ class RuntimeConfig(StrictModel):
     dry_run: bool = True
     log_format: Literal["console", "json"] = "console"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    redact: list[str] = Field(default_factory=list)
 
 
 class ModelConfig(StrictModel):
