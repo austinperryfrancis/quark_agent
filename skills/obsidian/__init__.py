@@ -1,0 +1,2 @@
+"""Obsidian note intelligence skill."""
+

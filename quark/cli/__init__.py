@@ -1,0 +1,2 @@
+"""Quark command-line interface."""
+

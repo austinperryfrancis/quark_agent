@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {"type": "string"},
+    "type": {"type": "string"},
+    "project": {"type": ["string", "null"]},
+    "created": {"type": ["string", "null"], "format": "date"},
+    "updated": {"type": ["string", "null"], "format": "date"},
+    "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "status": {"type": ["string", "null"]},
+    "action_required": {"type": "boolean"},
+    "people": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  },
+  "additionalProperties": false
+}
+

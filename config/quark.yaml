@@ -1,0 +1,12 @@
+runtime:
+  database: quark.db
+  dry_run: true
+
+model:
+  provider: ollama
+  temperature: 0.1
+
+obsidian:
+  vault: null
+  create_backups: true
+

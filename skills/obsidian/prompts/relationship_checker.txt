@@ -1,0 +1,2 @@
+Judge whether the target and candidate notes are meaningfully related and return only the requested structured result.
+

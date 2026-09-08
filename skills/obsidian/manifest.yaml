@@ -1,0 +1,22 @@
+skill:
+  name: obsidian
+  version: 0.1.0
+
+capabilities:
+  - obsidian.list_notes
+  - obsidian.read_note
+  - obsidian.parse_frontmatter
+  - obsidian.search_notes
+  - obsidian.generate_tags
+  - obsidian.find_related_notes
+  - obsidian.generate_frontmatter
+  - obsidian.validate_note
+  - obsidian.apply_changes
+
+permissions:
+  filesystem:
+    read:
+      - configured_vault
+    write:
+      - configured_vault
+

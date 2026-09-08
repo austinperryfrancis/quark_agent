@@ -1,0 +1,12 @@
+skill:
+  name: core_text
+  version: 0.1.0
+
+capabilities:
+  - text.classify
+  - text.extract
+  - text.compare
+  - text.summarize
+
+permissions: {}
+

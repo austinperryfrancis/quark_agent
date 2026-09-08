@@ -1,0 +1,2 @@
+"""Generic semantic text skill."""
+

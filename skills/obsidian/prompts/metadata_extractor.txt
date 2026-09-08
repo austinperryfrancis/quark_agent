@@ -1,0 +1,2 @@
+Extract frontmatter fields from the supplied note and return only data matching the provided schema.
+

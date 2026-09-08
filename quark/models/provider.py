@@ -1,0 +1,2 @@
+"""Generic model provider interface."""
+
