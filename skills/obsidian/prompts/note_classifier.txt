@@ -1,2 +1,0 @@
-Classify the supplied note using only the provided choices and output schema.
-

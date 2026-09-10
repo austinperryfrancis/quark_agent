@@ -1,1 +1,0 @@
-"""Quark Agent test suite."""

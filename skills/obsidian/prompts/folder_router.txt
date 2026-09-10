@@ -1,4 +1,0 @@
-Choose the single best destination folder for this note from the supplied choices.
-Use the note's content and proposed metadata when available. Return only the
-requested structured JSON. Prefer the most specific folder supported by the
-evidence; do not invent folders or paths. Give a brief, concrete justification.

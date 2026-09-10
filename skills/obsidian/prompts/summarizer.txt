@@ -1,1 +1,0 @@
-Summarize only the supplied note evidence. Return JSON matching the supplied schema.

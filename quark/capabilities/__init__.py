@@ -1,1 +1,0 @@
-"""Capability discovery and metadata."""

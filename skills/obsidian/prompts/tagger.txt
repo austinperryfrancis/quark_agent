@@ -1,2 +1,0 @@
-Select appropriate canonical tags for the supplied note and return only data matching the provided schema.
-
