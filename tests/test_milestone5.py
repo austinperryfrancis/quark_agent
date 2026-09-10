@@ -49,7 +49,7 @@ def test_tag_normalization_and_persistent_vault_sync(
         candidates = taxonomy.candidates("Advisor research about sanctions regressions")
 
     assert observed > 0
-    assert SCHEMA_VERSION == 4
+    assert SCHEMA_VERSION == 5
     assert {row["canonical_tag"] for row in rows} >= {"research", "sanctions"}
     assert "sanctions" in candidates
 
@@ -181,7 +181,7 @@ def test_note_index_incremental_sync_and_related_links(tmp_path: Path) -> None:
     vault = Path("/Users/austinfrancis/Documents/quark_agent/mock_vault")
     with StateDatabase(tmp_path / "state.db") as state:
         index = NoteIndex(state)
-        assert index.sync(vault) == 10
+        assert index.sync(vault) == 13
         assert index.sync(vault) == 0
         candidates = index.candidates("Inbox/Meeting Note.md", limit=5)
         assert candidates

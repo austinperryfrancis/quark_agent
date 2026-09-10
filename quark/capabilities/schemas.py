@@ -46,6 +46,8 @@ class SkillManifest(BaseModel):
 
     name: str
     version: str
+    entrypoint: str | None = None
+    intents: list[dict[str, Any]] = Field(default_factory=list)
     capabilities: list[str]
     capability_metadata: dict[str, dict[str, Any]] = Field(default_factory=dict)
     permissions: dict[str, Any] = Field(default_factory=dict)

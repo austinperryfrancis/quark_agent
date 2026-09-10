@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -33,3 +34,12 @@ class ModelProvider(Protocol):
     ) -> ModelResponse: ...
 
     def health_check(self, *, timeout_seconds: float | None = None) -> bool: ...
+
+    def generate_stream(
+        self,
+        prompt: str,
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout_seconds: float | None = None,
+    ) -> Iterator[str]: ...

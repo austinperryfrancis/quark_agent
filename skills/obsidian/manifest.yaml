@@ -1,6 +1,21 @@
 skill:
   name: obsidian
   version: 0.1.0
+  entrypoint: skills.obsidian.skill:ObsidianSkill
+
+intents:
+  - name: obsidian.search
+    description: Search or answer questions about the configured vault.
+    process: false
+  - name: obsidian.organize
+    description: Organize notes through a preview-first workflow.
+    process: true
+  - name: obsidian.move_note
+    description: Move inbox notes into appropriate vault folders.
+    process: true
+  - name: obsidian.organize_and_file
+    description: Classify, tag, link, and file inbox notes as one workflow.
+    process: true
 
 capabilities:
   - obsidian.list_notes

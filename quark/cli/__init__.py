@@ -1,11 +1,14 @@
 """Quark command-line interface."""
 
 import json
+import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from quark.cli.spinner import spinner
 from quark.config import ConfigurationError, QuarkConfig, load_config
 from quark.logging import configure_logging
 from quark.state.database import StateDatabase
@@ -23,13 +26,97 @@ from skills.obsidian.operations.read_note import read_note
 app = typer.Typer(
     name="quark",
     help="Harness-first local agent for small language models.",
-    no_args_is_help=True,
+    no_args_is_help=False,
+    invoke_without_command=True,
 )
+
+QUARK_BANNER = r"""
+             .       *
+          .-' \     / `-.
+        .'     \   /     `.
+       /        \ /        \
+      ;      u---●---d      ;
+       \        / \        /
+        `.     /   \     .'
+          `-. /  s  \ .-'
+             *       '
+         Q U A R K   A G E N T
+""".strip("\n")
+
+
+def _stream_token_writer(streamed: list[str]) -> Callable[[str], None]:
+    def write(token: str) -> None:
+        if not streamed:
+            typer.echo("\r" + " " * 24 + "\r", nl=False)
+            typer.echo("│ Quark: ", nl=False)
+        streamed.append(token)
+        typer.echo(token, nl=False)
+
+    return write
 
 
 @app.callback()
-def main() -> None:
-    """Run Quark Agent commands."""
+def main(
+    ctx: typer.Context,
+    config: Annotated[Path, typer.Option("--config", "-c")] = Path("config/quark.yaml"),
+    session: Annotated[str, typer.Option("--session")] = "default",
+) -> None:
+    """Run Quark Agent commands, or start chat when no command is supplied."""
+    if ctx.invoked_subcommand is not None:
+        return
+    try:
+        settings = load_config(config)
+    except ConfigurationError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(code=2) from error
+    from quark.bootstrap import build_agent
+
+    typer.echo(QUARK_BANNER)
+    typer.echo(
+        f"Model: {settings.model.name} | Session: {session} | Commands: /help or /exit"
+    )
+    with StateDatabase(settings.runtime.database) as state:
+        agent = build_agent(settings, state)
+        while True:
+            try:
+                typer.echo("├────────────────────────────────────────")
+                message = typer.prompt("│ You")
+            except (EOFError, KeyboardInterrupt):
+                typer.echo("\nGoodbye.")
+                break
+            if message.strip().casefold() in {"/exit", "/quit"}:
+                typer.echo("Goodbye.")
+                break
+            streamed: list[str] = []
+            streaming = callable(getattr(agent.provider, "generate_stream", None))
+            if streaming and sys.stdout.isatty():
+                typer.echo("│ Quark is thinking…", nl=False)
+            with spinner(enabled=not streaming):
+                response = agent.respond(
+                    session, message, on_token=_stream_token_writer(streamed)
+                )
+            settings.runtime.output_dir.mkdir(parents=True, exist_ok=True)
+            with (settings.runtime.output_dir / f"{session}.jsonl").open(
+                "a", encoding="utf-8"
+            ) as log:
+                log.write(
+                    json.dumps(
+                        {
+                            "message": message,
+                            "response": response.text,
+                            "route": response.route.route.value,
+                            "skill": response.route.skill,
+                            "intent": response.route.intent,
+                            "pending": state.pending_action(session) is not None,
+                        }
+                    )
+                    + "\n"
+                )
+            if streamed:
+                typer.echo()
+            else:
+                typer.echo(f"│ Quark: {response.text}")
+            typer.echo("╰────────────────────────────────────────")
 
 
 @app.command("check-config")

@@ -254,3 +254,45 @@ def classify_project(
         else ConfidenceRoute.ASK_USER
     )
     return ProjectDecision(result.value["choice"], confidence, route, result)
+
+
+def choose_folder(
+    runtime: SemanticRuntime,
+    document: NoteDocument,
+    folders: list[str],
+) -> tuple[str, float, str]:
+    """Ask the model to choose one approved destination folder."""
+    schema = {
+        "type": "object",
+        "required": ["folder", "confidence", "justification"],
+        "properties": {
+            "folder": {"type": "string", "enum": folders},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "justification": {"type": "string"},
+        },
+        "additionalProperties": False,
+    }
+    result = runtime.run(
+        SemanticTask(
+            operation="obsidian.choose_folder",
+            role="folder_router",
+            facts={"note": document.analysis_content},
+            choices=tuple(folders),
+            output_schema=schema,
+            content_hash=document.content_hash,
+            model_policy={"max_tokens": 48, "temperature": 0.0},
+        )
+    )
+    value = result.value
+    folder = value.get("folder")
+    confidence = value.get("confidence")
+    justification = value.get("justification")
+    if (
+        not isinstance(folder, str)
+        or folder not in folders
+        or not isinstance(confidence, (int, float))
+        or isinstance(confidence, bool)
+        or not isinstance(justification, str)
+    ):
+        raise SemanticError("folder proposal was invalid")
+    return folder, float(confidence), justification

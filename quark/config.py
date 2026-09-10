@@ -20,6 +20,7 @@ class RuntimeConfig(StrictModel):
     log_format: Literal["console", "json"] = "console"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     redact: list[str] = Field(default_factory=list)
+    output_dir: Path = Path("output")
 
 
 class ModelConfig(StrictModel):
@@ -29,6 +30,7 @@ class ModelConfig(StrictModel):
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     max_tokens: int = Field(default=256, gt=0)
     timeout_seconds: float = Field(default=60.0, gt=0)
+    think: bool = False
 
 
 class VaultConfig(StrictModel):
@@ -88,6 +90,10 @@ class RetryConfig(StrictModel):
     backoff_multiplier: float = Field(default=2.0, ge=1)
 
 
+class WorkflowConfig(StrictModel):
+    validation: Literal["user", "agent", "off"] = "user"
+
+
 class QuarkConfig(StrictModel):
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
@@ -95,6 +101,7 @@ class QuarkConfig(StrictModel):
     permissions: PermissionsConfig = Field(default_factory=PermissionsConfig)
     frontmatter: FrontmatterConfig = Field(default_factory=FrontmatterConfig)
     retries: RetryConfig = Field(default_factory=RetryConfig)
+    workflows: WorkflowConfig = Field(default_factory=WorkflowConfig)
 
 
 class ConfigurationError(ValueError):

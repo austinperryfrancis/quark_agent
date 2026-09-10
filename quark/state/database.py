@@ -14,7 +14,7 @@ from typing import Any, cast
 
 from quark.state.models import GoalStatus, StepStatus, enum_value
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _MIGRATION_1 = """
 CREATE TABLE IF NOT EXISTS goals (
@@ -172,6 +172,53 @@ CREATE TABLE IF NOT EXISTS note_index (
 CREATE VIRTUAL TABLE IF NOT EXISTS note_fts USING fts5(note_id UNINDEXED, title, body);
 """
 
+_MIGRATION_5 = """
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    summary TEXT NOT NULL DEFAULT '',
+    active_process TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS route_decisions (
+    id INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    route TEXT NOT NULL,
+    skill TEXT,
+    intent TEXT,
+    confidence REAL NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS skill_invocations (
+    id INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    skill TEXT NOT NULL,
+    intent TEXT NOT NULL,
+    status TEXT NOT NULL,
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pending_actions (
+    id INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    skill TEXT NOT NULL,
+    intent TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    resolved_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, id);
+CREATE INDEX IF NOT EXISTS idx_pending_session ON pending_actions(session_id, status);
+"""
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
@@ -245,6 +292,9 @@ class StateDatabase:
             if version < 4:
                 self.connection.executescript(_MIGRATION_4)
                 version = 4
+            if version < 5:
+                self.connection.executescript(_MIGRATION_5)
+                version = 5
             self.connection.execute(f"PRAGMA user_version = {version}")
             self.connection.commit()
 
@@ -585,6 +635,82 @@ class StateDatabase:
         return self.connection.execute(
             "SELECT * FROM tag_index ORDER BY frequency DESC, canonical_tag"
         ).fetchall()
+
+    def ensure_session(self, session_id: str) -> None:
+        now = _now()
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO sessions(id,created_at,updated_at) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET updated_at=excluded.updated_at",
+                (session_id, now, now),
+            )
+
+    def add_message(self, session_id: str, role: str, content: str) -> None:
+        self.ensure_session(session_id)
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO messages(session_id,role,content,created_at) VALUES(?,?,?,?)",
+                (session_id, role, content, _now()),
+            )
+
+    def recent_messages(self, session_id: str, limit: int = 8) -> list[dict[str, str]]:
+        rows = self.connection.execute(
+            "SELECT role,content FROM messages WHERE session_id=? ORDER BY id DESC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+        return [dict(row) for row in reversed(rows)]
+
+    def record_route(
+        self,
+        session_id: str,
+        route: str,
+        skill: str | None,
+        intent: str | None,
+        confidence: float,
+    ) -> None:
+        self.ensure_session(session_id)
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO route_decisions(session_id,route,skill,intent,confidence,created_at) VALUES(?,?,?,?,?,?)",
+                (session_id, route, skill, intent, confidence, _now()),
+            )
+
+    def record_skill_invocation(
+        self, session_id: str, skill: str, intent: str, status: str, result: Any
+    ) -> None:
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO skill_invocations(session_id,skill,intent,status,result_json,created_at) VALUES(?,?,?,?,?,?)",
+                (session_id, skill, intent, status, _json(result), _now()),
+            )
+
+    def create_pending_action(
+        self, session_id: str, skill: str, intent: str, payload: Any
+    ) -> int:
+        with self.transaction() as connection:
+            cursor = connection.execute(
+                "INSERT INTO pending_actions(session_id,skill,intent,payload_json,created_at) VALUES(?,?,?,?,?)",
+                (session_id, skill, intent, _json(payload), _now()),
+            )
+            return cast(int, cursor.lastrowid)
+
+    def pending_action(self, session_id: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM pending_actions WHERE session_id=? AND status='pending' ORDER BY id DESC LIMIT 1",
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["payload"] = json.loads(result.pop("payload_json"))
+        return result
+
+    def resolve_pending_action(self, action_id: int, status: str) -> None:
+        with self.transaction() as connection:
+            connection.execute(
+                "UPDATE pending_actions SET status=?,resolved_at=? WHERE id=? AND status='pending'",
+                (status, _now(), action_id),
+            )
 
     def record_model_call(
         self,

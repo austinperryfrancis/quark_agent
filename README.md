@@ -24,6 +24,18 @@ Shared defaults live in `config/quark.yaml`. Machine-specific values such as the
 vault path and local model name belong in ignored `config/quark.local.yaml`,
 which is merged over the defaults. Run `quark check-config` to validate them.
 
+## Interactive agent
+
+Run `quark` with no subcommand to start a persistent conversational session.
+Quark deterministically shortlists high-level intents, asks the small model only
+when routing is ambiguous, and then either chats or invokes one executable skill.
+Write-capable skill processes produce a preview and wait for a later `yes` before
+applying changes. `/skills`, `/status`, `/clear`, `/help`, and `/exit` are handled
+without model reasoning.
+
+Set `vault.path` in the ignored `config/quark.local.yaml` to enable the Obsidian
+skill. Explicit commands such as `quark organize` remain available for scripts.
+
 Validated writes can retain original notes under `.quark/backups/` inside the
 vault. `vault.backup_retention` controls how many timestamped backups are kept
 per note; the default is five. The `.quark` directory is excluded from note
