@@ -833,7 +833,10 @@ class SkillRunner:
                 raise
             call.error = SkillError(
                 code="CHILD_SKILL_FAILED",
-                message=f"Child Skill {exc.call.skill_name!r} failed.",
+                message=(
+                    f"Child Skill {exc.call.skill_name!r} failed: "
+                    f"{exc.call.error.message if exc.call.error else str(exc)}"
+                ),
                 recoverable=bool(exc.call.error and exc.call.error.recoverable),
                 details={"child_call_id": exc.call.id},
             )

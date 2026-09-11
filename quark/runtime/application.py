@@ -35,6 +35,19 @@ class QuarkRuntime:
             return await self._handle_message(session_key, text)
 
     async def _handle_message(self, session_key: str, text: str) -> GatewayResponse:
+        normalized = text.strip().casefold().rstrip(".!?")
+        if normalized in {
+            "what skills do you have",
+            "what skills are available",
+            "what can you do",
+            "show skills",
+            "list skills",
+        }:
+            return self.skills()
+        if normalized in {"status", "show status", "runtime status"}:
+            return self.status()
+        if normalized in {"show runs", "list runs"}:
+            return self.list_runs()
         session = self.runner.sessions.get(session_key)
         if session and session.pending_interaction:
             try:

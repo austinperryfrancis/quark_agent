@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import pytest
 
 from quark.inference import Message, ModelProvider, ValidationDecision, ValidationOutcome
@@ -15,8 +15,8 @@ from quark.skills.obsidian import (
     build_obsidian_skills,
     register_obsidian_skills,
 )
-from quark.skills.obsidian.models import TagProposal
-from quark.skills.obsidian.prompts import PROMPT_VERSION
+from quark.skills.obsidian.models import ProposeTagsInput, TagProposal
+from quark.skills.obsidian.prompts import PROMPT_VERSION, build_tag_prompt
 from quark.skills.obsidian.vault import NoteNotFoundError, VaultPathError
 
 
@@ -137,7 +137,49 @@ def test_tag_proposal_uses_one_typed_task_local_inference(tmp_path) -> None:
 
     assert call.result == TagProposal(tags=["research", "supply-chain"])
     assert provider.calls == [ValidationDecision, TagProposal]
-    assert PROMPT_VERSION == "obsidian.tags.propose.v1"
+    assert PROMPT_VERSION == "obsidian.tags.propose.v2"
+
+
+def test_tag_contract_is_bounded_unique_and_kebab_case() -> None:
+    assert TagProposal(tags=["Supply Chain", "LOCAL_MODELS"]).tags == [
+        "supply-chain",
+        "local-models",
+    ]
+
+    with pytest.raises(ValidationError, match="at most 5 items"):
+        TagProposal(tags=["one", "two", "three", "four", "five", "six"])
+    with pytest.raises(ValidationError, match="unique after normalization"):
+        TagProposal(tags=["supply chain", "supply-chain"])
+    with pytest.raises(ValidationError, match="lowercase kebab-case"):
+        TagProposal(tags=["invalid/tag"])
+
+
+def test_tag_prompt_requests_small_reusable_set_and_existing_tag_preference() -> None:
+    prompt = build_tag_prompt(
+        ProposeTagsInput(
+            path="Inbox/research.md",
+            content="Research about semiconductor supply chains.",
+            existing_tags=["semiconductors"],
+        )
+    )
+
+    assert "Return 3 to 5" in prompt
+    assert "lowercase kebab-case" in prompt
+    assert "Retain an existing tag" in prompt
+    assert "near-duplicates" in prompt
+    assert 'EXISTING TAGS\n["semiconductors"]' in prompt
+
+
+def test_organize_contract_tells_model_not_to_invent_latest_note_path(tmp_path) -> None:
+    organize = next(
+        skill
+        for skill in build_obsidian_skills(make_vault(tmp_path))
+        if skill.name == "obsidian.organize_note"
+    )
+    schema = organize.input_schema.model_json_schema()
+
+    assert "Use null" in schema["properties"]["path"]["description"]
+    assert "path must be null" in organize.validator_instructions
 
 
 def test_organize_note_recurses_to_independently_reviewed_apply(tmp_path) -> None:

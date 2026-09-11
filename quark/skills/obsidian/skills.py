@@ -113,6 +113,10 @@ class OrganizeNoteSkill(Skill):
     side_effect = SideEffect.LOCAL_WRITE
     review_policy = ReviewPolicy.NEVER
     top_level = True
+    validator_instructions = (
+        "When the user asks for the latest or newest inbox note without naming a "
+        "file, path must be null. Never invent a file or directory path."
+    )
 
     async def run(self, ctx: SkillContext, args: OrganizeNoteInput) -> OrganizeNoteResult:
         path = args.path

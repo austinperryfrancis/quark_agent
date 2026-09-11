@@ -39,6 +39,16 @@ python -m pytest
 
 The architecture specification is authoritative for future work.
 
+Run the opt-in live routing evaluation against an installed Ollama model with:
+
+```bash
+python -m scripts.evaluate_local_model --model qwen3:1.7b
+```
+
+This contacts the local Ollama service and reports per-case correctness, latency,
+and structured-output failures. It is intentionally separate from the offline
+unit suite.
+
 ## Runtime
 
 Start the single local runtime in one terminal:
@@ -46,6 +56,10 @@ Start the single local runtime in one terminal:
 ```bash
 quark serve
 ```
+
+The default socket and database live under `~/.quark`, so gateway commands work
+from any current directory. `quark chat` checks the runtime immediately and
+shows how many Skills are enabled before accepting requests.
 
 For validated file-based configuration, copy `config.example.yaml`, edit it,
 and start:

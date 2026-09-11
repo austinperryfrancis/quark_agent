@@ -102,7 +102,29 @@ def test_generated_arguments_become_proposal_then_execute_after_approval() -> No
     assert '"text"' in generation_prompt
     assert "Text must preserve the user's meaning." in validation_prompt
     assert GENERATE_ARGUMENTS_PROMPT_VERSION == "generate_arguments.v1"
-    assert VALIDATE_CALL_PROMPT_VERSION == "validate_call.v1"
+    assert VALIDATE_CALL_PROMPT_VERSION == "validate_call.v2"
+
+
+def test_child_validation_prompt_describes_the_call_as_a_parent_step() -> None:
+    provider = QueueProvider(
+        ValidationDecision(decision=ValidationOutcome.APPROVE),
+        ValidationDecision(decision=ValidationOutcome.APPROVE),
+    )
+    runner = make_runner(provider, EchoSkill(), ParentSkill())
+
+    asyncio.run(
+        runner.run(
+            "test.parent",
+            {"text": "hello"},
+            original_request="Echo hello through the parent.",
+        )
+    )
+
+    root_prompt = provider.calls[0][0][0].content
+    child_prompt = provider.calls[1][0][0].content
+    assert "This is the root call" in root_prompt
+    assert "child step proposed by test.parent" in child_prompt
+    assert "does not need to complete the original request by itself" in child_prompt
 
 
 def test_invalid_generated_arguments_fail_before_validator() -> None:

@@ -1,6 +1,6 @@
 runtime:
-  socket_path: .quark/quark.sock
-  database_path: .quark/quark.db
+  socket_path: ~/.quark/quark.sock
+  database_path: ~/.quark/quark.db
   max_depth: 8
   max_calls_per_run: 100
   max_validation_revisions: 2

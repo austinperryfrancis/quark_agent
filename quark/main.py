@@ -8,6 +8,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import sys
 from typing import Sequence
 
 from quark.gateways import (
@@ -25,7 +26,16 @@ from quark.runtime import QuarkRuntime, RuntimeService, SkillRunner
 from quark.skills import SkillRegistry
 from quark.skills.obsidian import build_obsidian_skills
 
-DEFAULT_RUNTIME_DIRECTORY = Path(".quark")
+DEFAULT_RUNTIME_DIRECTORY = Path.home() / ".quark"
+
+QUARK_BANNER = r"""
+             .       *
+         *       .
+      -----(  q  )-----
+         .       *
+            Q U A R K
+      deterministic skills
+""".strip("\n")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -168,6 +178,36 @@ async def _request(socket: Path, request: GatewayRequest) -> GatewayResponse:
     return await LocalRuntimeClient(socket).request(request)
 
 
+async def _request_with_activity(
+    socket: Path, request: GatewayRequest, *, executing: bool = False
+) -> GatewayResponse:
+    if not sys.stdout.isatty():
+        return await _request(socket, request)
+    frames = ("|", "/", "-", "\\")
+    words = (
+        ("executing", "working", "finishing")
+        if executing
+        else ("working", "thinking", "mulling", "checking")
+    )
+    task = asyncio.create_task(_request(socket, request))
+    step = 0
+    try:
+        while not task.done():
+            word = words[(step // 10) % len(words)]
+            print(
+                f"\r{frames[step % len(frames)]} Quark is {word}...",
+                end="",
+                flush=True,
+            )
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=0.12)
+            except TimeoutError:
+                step += 1
+        return await task
+    finally:
+        print("\r\033[2K", end="", flush=True)
+
+
 def _print_response(response: GatewayResponse) -> None:
     print(response.message)
     if response.data:
@@ -189,7 +229,19 @@ def _gateway_request(args: argparse.Namespace) -> GatewayRequest:
 
 
 def _chat(args: argparse.Namespace) -> None:
-    print("Quark Agent — connected to local runtime. Ctrl-D to exit.")
+    print(QUARK_BANNER)
+    status = asyncio.run(
+        _request(args.socket, GatewayRequest(command=GatewayCommand.STATUS))
+    )
+    skill_count = status.data.get("installed_skills", 0)
+    waiting_count = status.data.get("waiting_runs", 0)
+    print(f"\nRuntime online | {skill_count} Skills | {waiting_count} waiting Runs")
+    if skill_count == 0:
+        print(
+            "No Skills are enabled. Restart `quark serve` with --vault PATH "
+            "or a configured vault_path."
+        )
+    print("Type a request. Ctrl-D to exit.\n")
     while True:
         try:
             text = input("You > ").strip()
@@ -199,16 +251,20 @@ def _chat(args: argparse.Namespace) -> None:
         if not text:
             continue
         response = asyncio.run(
-            _request(
+            _request_with_activity(
                 args.socket,
                 GatewayRequest(
                     command=GatewayCommand.CHAT,
                     session_key=args.session,
                     text=text,
                 ),
+                executing=text.casefold().strip().rstrip(".!?")
+                in {"yes", "y", "approve", "approved", "ok", "okay"},
             )
         )
-        _print_response(response)
+        print(f"Quark > {response.message}")
+        if response.data:
+            print(json.dumps(response.data, indent=2, sort_keys=True))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

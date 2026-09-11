@@ -116,6 +116,7 @@ def test_child_arguments_are_validated_independently() -> None:
     assert parent.error.code == "CHILD_SKILL_FAILED"
     assert child.status is SkillCallStatus.FAILED
     assert child.error.code == "INPUT_SCHEMA_VALIDATION_FAILED"
+    assert child.error.message in parent.error.message
 
 
 def test_invalid_top_level_arguments_fail_and_preserve_call() -> None:

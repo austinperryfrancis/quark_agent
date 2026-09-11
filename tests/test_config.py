@@ -12,7 +12,7 @@ from quark.models import ReviewPolicy
 def test_default_configuration_is_valid_and_local() -> None:
     config = load_config()
 
-    assert config.runtime.database_path == Path(".quark/quark.db")
+    assert config.runtime.database_path == Path.home() / ".quark/quark.db"
     assert config.runtime.max_depth == 8
     assert config.models.default == "qwen3:1.7b"
     assert not config.telegram.enabled

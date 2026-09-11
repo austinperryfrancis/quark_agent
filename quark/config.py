@@ -10,15 +10,22 @@ import yaml
 
 from quark.models import ReviewPolicy
 
+_DEFAULT_RUNTIME_DIRECTORY = Path.home() / ".quark"
+
 
 class RuntimeSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    socket_path: Path = Path(".quark/quark.sock")
-    database_path: Path = Path(".quark/quark.db")
+    socket_path: Path = _DEFAULT_RUNTIME_DIRECTORY / "quark.sock"
+    database_path: Path = _DEFAULT_RUNTIME_DIRECTORY / "quark.db"
     max_depth: int = Field(default=8, ge=0)
     max_calls_per_run: int = Field(default=100, ge=1)
     max_validation_revisions: int = Field(default=2, ge=0)
+
+    @field_validator("socket_path", "database_path")
+    @classmethod
+    def expand_runtime_path(cls, value: Path) -> Path:
+        return value.expanduser()
 
 
 class ModelSettings(BaseModel):
@@ -33,6 +40,11 @@ class ObsidianSettings(BaseModel):
 
     vault_path: Path | None = None
     inbox_path: str = Field(default="Inbox", min_length=1)
+
+    @field_validator("vault_path")
+    @classmethod
+    def expand_vault_path(cls, value: Path | None) -> Path | None:
+        return value.expanduser() if value is not None else None
 
 
 class TelegramSettings(BaseModel):

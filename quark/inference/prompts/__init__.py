@@ -16,10 +16,10 @@ from quark.inference.prompts.route_skill_v1 import (
     PROMPT_VERSION as ROUTE_SKILL_PROMPT_VERSION,
 )
 from quark.inference.prompts.route_skill_v1 import build_route_prompt
-from quark.inference.prompts.validate_call_v1 import (
+from quark.inference.prompts.validate_call_v2 import (
     PROMPT_VERSION as VALIDATE_CALL_PROMPT_VERSION,
 )
-from quark.inference.prompts.validate_call_v1 import build_validate_call_prompt
+from quark.inference.prompts.validate_call_v2 import build_validate_call_prompt
 
 __all__ = [
     "CLASSIFY_RESPONSE_PROMPT_VERSION",

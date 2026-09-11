@@ -151,6 +151,18 @@ def test_unrelated_request_can_route_while_review_remains_pending() -> None:
     assert runtime.runner.sessions["cli:default"].pending_interaction is pending
 
 
+def test_capability_question_is_answered_without_model_routing() -> None:
+    runtime = make_runtime(QueueProvider(), EchoSkill())
+
+    response = asyncio.run(
+        runtime.handle_message("cli:default", "What skills do you have?")
+    )
+
+    assert response.kind == "SKILLS"
+    assert response.data["skills"][0]["name"] == "test.echo"
+    assert len(runtime.runner.runs) == 0
+
+
 def test_messages_for_same_session_execute_serially() -> None:
     provider = QueueProvider(
         RouteDecision(skill="test.concurrent"),
