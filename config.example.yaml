@@ -1,0 +1,25 @@
+runtime:
+  socket_path: .quark/quark.sock
+  database_path: .quark/quark.db
+  max_depth: 8
+  max_calls_per_run: 100
+  max_validation_revisions: 2
+
+models:
+  default: qwen3:1.7b
+  ollama_url: http://localhost:11434
+
+obsidian:
+  vault_path: /path/to/Obsidian/Vault
+  inbox_path: Inbox
+
+telegram:
+  enabled: false
+
+logging:
+  level: INFO
+
+skills:
+  obsidian.tags.apply:
+    enabled: true
+    review: always
